@@ -1,6 +1,6 @@
 """设置界面组件 — 配置番茄钟参数。"""
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QSpinBox, QComboBox, QCheckBox,
@@ -52,6 +52,9 @@ class SettingsSpinRow(QWidget):
 
 class SettingsWidget(QWidget):
     """设置面板"""
+
+    # 设置变更信号：通知外部应用更新主题、语言等
+    settings_changed = pyqtSignal(dict)
 
     def __init__(self, settings_manager: SettingsManager, parent=None):
         super().__init__(parent)
@@ -214,6 +217,38 @@ class SettingsWidget(QWidget):
         # ── 连接信号 ──
         self._save_btn.clicked.connect(self._save_settings)
         self._reset_btn.clicked.connect(self._reset_settings)
+        # 切换主题/语言时立即生效（不等待保存按钮）
+        self._theme_combo.currentIndexChanged.connect(self._apply_preview)
+        self._lang_combo.currentIndexChanged.connect(self._apply_preview)
+
+    def _get_current_values(self):
+        """获取当前表单中的所有设置值"""
+        t = TimerSettings(
+            work_duration=self._work_spin.value,
+            short_break=self._short_break_spin.value,
+            long_break=self._long_break_spin.value,
+            long_break_interval=self._interval_spin.value,
+            daily_goal=self._goal_spin.value,
+            auto_start_break=self._auto_break_cb.isChecked(),
+            auto_start_work=self._auto_work_cb.isChecked(),
+        )
+        s = AppSettings(
+            timer=t,
+            theme="light" if self._theme_combo.currentIndex() == 0 else "dark",
+            language="zh" if self._lang_combo.currentIndex() == 0 else "en",
+            minimize_to_tray=self._tray_cb.isChecked(),
+            notification_enabled=self._notify_cb.isChecked(),
+            sound_enabled=self._sound_cb.isChecked(),
+        )
+        return t, s
+
+    def _apply_preview(self):
+        """主题/语言切换时立即预览效果"""
+        _, s = self._get_current_values()
+        self.settings_changed.emit({
+            "theme": s.theme,
+            "language": s.language,
+        })
 
     def _load_settings(self):
         s = self._settings_manager.settings
@@ -235,25 +270,16 @@ class SettingsWidget(QWidget):
         self._lang_combo.setCurrentIndex(0 if s.language == "zh" else 1)
 
     def _save_settings(self):
-        t = TimerSettings(
-            work_duration=self._work_spin.value,
-            short_break=self._short_break_spin.value,
-            long_break=self._long_break_spin.value,
-            long_break_interval=self._interval_spin.value,
-            daily_goal=self._goal_spin.value,
-            auto_start_break=self._auto_break_cb.isChecked(),
-            auto_start_work=self._auto_work_cb.isChecked(),
-        )
-        s = AppSettings(
-            timer=t,
-            theme="light" if self._theme_combo.currentIndex() == 0 else "dark",
-            language="zh" if self._lang_combo.currentIndex() == 0 else "en",
-            minimize_to_tray=self._tray_cb.isChecked(),
-            notification_enabled=self._notify_cb.isChecked(),
-            sound_enabled=self._sound_cb.isChecked(),
-        )
+        t, s = self._get_current_values()
         self._settings_manager._settings = s
         self._settings_manager.save()
+
+        # 通知 MainWindow 应用变更
+        self.settings_changed.emit({
+            "theme": s.theme,
+            "language": s.language,
+            "timer": t,
+        })
 
         # 反馈
         self._save_btn.setText("✅ 已保存")
@@ -263,6 +289,15 @@ class SettingsWidget(QWidget):
     def _reset_settings(self):
         self._settings_manager.reset()
         self._load_settings()
+
+        # 通知 MainWindow 恢复默认
+        s = self._settings_manager.settings
+        self.settings_changed.emit({
+            "theme": s.theme,
+            "language": s.language,
+            "timer": s.timer,
+        })
+
         self._save_btn.setText("↩️ 已重置")
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(2000, lambda: self._save_btn.setText("💾 保存设置"))

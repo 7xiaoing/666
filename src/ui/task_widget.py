@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont, QAction
 
+from ..i18n import STRINGS
+
 
 class TaskItem(QFrame):
     """单个任务项目"""
@@ -93,23 +95,25 @@ class TaskWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tasks: list[TaskItem] = []
+        self._lang = "zh"
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
+        t = STRINGS.get(self._lang, STRINGS["zh"])
 
         # ── 标题 ──
-        title = QLabel("📋 任务列表")
-        title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        title.setStyleSheet("color: #2C3E50;")
-        layout.addWidget(title)
+        self._task_title = QLabel(t.get("task_title", "📋 任务列表"))
+        self._task_title.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        self._task_title.setStyleSheet("color: #2C3E50;")
+        layout.addWidget(self._task_title)
 
         # ── 输入区域 ──
         input_layout = QHBoxLayout()
         self._input_field = QLineEdit()
-        self._input_field.setPlaceholderText("输入新任务...")
+        self._input_field.setPlaceholderText(t.get("task_placeholder", "输入新任务..."))
         self._input_field.setStyleSheet("""
             QLineEdit {
                 padding: 10px 16px;
@@ -123,7 +127,7 @@ class TaskWidget(QWidget):
             }
         """)
 
-        self._add_btn = QPushButton("＋ 添加")
+        self._add_btn = QPushButton(t.get("task_add", "＋ 添加"))
         self._add_btn.setStyleSheet("""
             QPushButton {
                 background: #3498DB; color: white;
@@ -144,7 +148,7 @@ class TaskWidget(QWidget):
         layout.addLayout(self._task_container)
 
         # ── 空状态 ──
-        self._empty_label = QLabel("还没有任务，添加一个吧 ✍️")
+        self._empty_label = QLabel(t.get("task_empty", "还没有任务，添加一个吧 ✍️"))
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setStyleSheet("color: #BDC3C7; font-size: 14px; padding: 40px;")
         layout.addWidget(self._empty_label)
@@ -185,3 +189,12 @@ class TaskWidget(QWidget):
         to_remove = [t for t in self._tasks if t.is_completed]
         for item in to_remove:
             self._remove_task(item)
+
+    def set_language(self, lang: str):
+        """切换语言"""
+        self._lang = lang
+        t = STRINGS.get(lang, STRINGS["zh"])
+        self._task_title.setText(t.get("task_title", "📋 任务列表"))
+        self._input_field.setPlaceholderText(t.get("task_placeholder", "输入新任务..."))
+        self._add_btn.setText(t.get("task_add", "＋ 添加"))
+        self._empty_label.setText(t.get("task_empty", "还没有任务，添加一个吧 ✍️"))

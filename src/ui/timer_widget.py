@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont, QPainter, QColor, QBrush, QPen, QConicalGradient
 
 from ..timer import PomodoroTimer, TimerPhase, TimerState
+from ..i18n import STRINGS
 
 
 class CircularProgressBar(QWidget):
@@ -65,18 +66,25 @@ class TimerWidget(QWidget):
         TimerPhase.IDLE: QColor("#95A5A6"),          # 灰色 — 空闲
     }
 
-    PHASE_LABELS = {
-        TimerPhase.WORK: "🍅 工作中",
-        TimerPhase.SHORT_BREAK: "☕ 短休息",
-        TimerPhase.LONG_BREAK: "🌴 长休息",
-        TimerPhase.IDLE: "⏳ 准备就绪",
-    }
+    PHASE_LABELS = {}  # 将在 set_language 中填充
 
     def __init__(self, timer: PomodoroTimer, parent=None):
         super().__init__(parent)
         self._timer = timer
+        self._lang = "zh"
+        self._build_phase_labels("zh")
         self._setup_ui()
         self._connect_signals()
+
+    def _build_phase_labels(self, lang: str):
+        """根据语言构建阶段标签"""
+        t = STRINGS.get(lang, STRINGS["zh"])
+        self.PHASE_LABELS = {
+            TimerPhase.WORK: t.get("phase_work", "🍅 工作中"),
+            TimerPhase.SHORT_BREAK: t.get("phase_short_break", "☕ 短休息"),
+            TimerPhase.LONG_BREAK: t.get("phase_long_break", "🌴 长休息"),
+            TimerPhase.IDLE: t.get("phase_idle", "⏳ 准备就绪"),
+        }
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -227,18 +235,45 @@ class TimerWidget(QWidget):
             self._progress_bar.setValue(0)
 
     def _on_state_changed(self, state: TimerState):
+        t = STRINGS.get(self._lang, STRINGS["zh"])
         if state == TimerState.RUNNING:
             self._start_btn.setEnabled(False)
             self._pause_btn.setEnabled(True)
-            self._pause_btn.setText("⏸ 暂停")
+            self._pause_btn.setText(t.get("btn_pause", "⏸ 暂停"))
             self._stop_btn.setEnabled(True)
         elif state == TimerState.PAUSED:
-            self._pause_btn.setText("▶ 继续")
+            self._pause_btn.setText(t.get("btn_resume", "▶ 继续"))
         elif state == TimerState.STOPPED:
             self._start_btn.setEnabled(True)
             self._pause_btn.setEnabled(False)
             self._stop_btn.setEnabled(False)
-            self._pause_btn.setText("⏸ 暂停")
+            self._pause_btn.setText(t.get("btn_pause", "⏸ 暂停"))
 
     def update_count(self, count: int):
-        self._count_label.setText(f"🍅 今日番茄: {count}")
+        t = STRINGS.get(self._lang, STRINGS["zh"])
+        self._count_label.setText(t.get("today_count", "今日番茄: {}").format(count))
+
+    def set_language(self, lang: str):
+        """切换语言"""
+        self._lang = lang
+        self._build_phase_labels(lang)
+        t = STRINGS.get(lang, STRINGS["zh"])
+
+        # 更新按钮文本
+        self._start_btn.setText(t.get("btn_start", "▶ 开始"))
+        if self._timer.state == TimerState.PAUSED:
+            self._pause_btn.setText(t.get("btn_resume", "▶ 继续"))
+        else:
+            self._pause_btn.setText(t.get("btn_pause", "⏸ 暂停"))
+        self._stop_btn.setText(t.get("btn_stop", "⏹ 停止"))
+
+        # 更新阶段标签（如果当前处于 IDLE，直接显示）
+        self._phase_label.setText(
+            self.PHASE_LABELS.get(self._timer.phase, t.get("phase_idle", ""))
+        )
+
+        # 更新计数标签
+        t = STRINGS.get(lang, STRINGS["zh"])
+        self._count_label.setText(t.get("today_count", "今日番茄: {}").format(
+            self._count_label.text().split(":")[-1].strip() if ":" in self._count_label.text() else "0"
+        ))

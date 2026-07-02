@@ -6,11 +6,12 @@ from PyQt6.QtWidgets import (
     QPushButton, QStackedWidget, QLabel, QFrame,
     QApplication, QSystemTrayIcon, QMenu
 )
-from PyQt6.QtGui import QFont, QIcon, QAction, QPixmap, QPainter, QColor
+from PyQt6.QtGui import QFont, QIcon, QAction, QPixmap, QPainter, QColor, QPalette
 
 from ..timer import PomodoroTimer, TimerPhase, TimerState
 from ..models.settings import SettingsManager
 from ..models.statistics import StatsManager, PomodoroRecord
+from ..i18n import STRINGS
 
 from .timer_widget import TimerWidget
 from .statistics_widget import StatisticsWidget
@@ -68,6 +69,10 @@ class MainWindow(QMainWindow):
         self._setup_tray()
         self._connect_signals()
 
+        # 应用初始语言设置
+        s = self._settings_manager.settings
+        self._apply_language(s.language)
+
     def _setup_window(self):
         self.setWindowTitle("🍅 番茄钟")
         self.setMinimumSize(900, 650)
@@ -99,34 +104,31 @@ class MainWindow(QMainWindow):
         sidebar_layout.setSpacing(8)
 
         # Logo
-        logo = QLabel("🍅")
-        logo.setStyleSheet("font-size: 36px;")
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._sidebar_logo = QLabel("🍅")
+        self._sidebar_logo.setStyleSheet("font-size: 36px;")
+        self._sidebar_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        app_name = QLabel("番茄钟")
-        app_name.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        app_name.setStyleSheet("color: white;")
-        app_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._sidebar_title = QLabel("番茄钟")
+        self._sidebar_title.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self._sidebar_title.setStyleSheet("color: white;")
+        self._sidebar_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        version = QLabel("v1.0.0")
-        version.setStyleSheet("color: #7F8C8D; font-size: 11px;")
-        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._sidebar_version = QLabel("v1.0.0")
+        self._sidebar_version.setStyleSheet("color: #7F8C8D; font-size: 11px;")
+        self._sidebar_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        sidebar_layout.addWidget(logo)
-        sidebar_layout.addWidget(app_name)
-        sidebar_layout.addWidget(version)
+        sidebar_layout.addWidget(self._sidebar_logo)
+        sidebar_layout.addWidget(self._sidebar_title)
+        sidebar_layout.addWidget(self._sidebar_version)
         sidebar_layout.addSpacing(30)
 
         # 导航按钮
         self._nav_buttons = []
-        nav_items = [
-            ("timer", "⏱️", "计时器"),
-            ("stats", "📊", "统计"),
-            ("tasks", "📋", "任务"),
-            ("settings", "⚙️", "设置"),
-        ]
+        self._nav_keys = ["timer", "stats", "tasks", "settings"]
+        self._nav_icons = ["⏱️", "📊", "📋", "⚙️"]
+        nav_labels = ["计时器", "统计", "任务", "设置"]
 
-        for key, icon, label in nav_items:
+        for key, icon, label in zip(self._nav_keys, self._nav_icons, nav_labels):
             btn = SidebarButton(label, icon)
             btn.clicked.connect(lambda checked, k=key: self._switch_page(k))
             self._nav_buttons.append(btn)
@@ -135,10 +137,10 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # 底部信息
-        footer = QLabel("🍅 专注每一刻")
-        footer.setStyleSheet("color: #566573; font-size: 11px;")
-        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        sidebar_layout.addWidget(footer)
+        self._sidebar_footer = QLabel("🍅 专注每一刻")
+        self._sidebar_footer.setStyleSheet("color: #566573; font-size: 11px;")
+        self._sidebar_footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sidebar_layout.addWidget(self._sidebar_footer)
 
         # ── 内容区域 ──
         content = QFrame()
@@ -193,6 +195,7 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self._timer.completed.connect(self._on_timer_completed)
         self._timer.tick.connect(self._update_tray_tooltip)
+        self._settings_widget.settings_changed.connect(self._on_settings_changed)
 
     def _switch_page(self, key: str):
         pages = {"timer": 0, "stats": 1, "tasks": 2, "settings": 3}
@@ -222,6 +225,91 @@ class MainWindow(QMainWindow):
             long_break_sec=s.timer.long_break_seconds,
             long_break_interval=s.timer.long_break_interval,
         )
+
+    def _on_settings_changed(self, changes: dict):
+        """收到设置变更通知，应用主题/语言等"""
+        if "theme" in changes:
+            self._apply_theme(changes["theme"])
+        if "language" in changes:
+            self._apply_language(changes["language"])
+        if "timer" in changes:
+            t = changes["timer"]
+            self._timer.configure(
+                work_sec=t.work_seconds,
+                short_break_sec=t.short_break_seconds,
+                long_break_sec=t.long_break_seconds,
+                long_break_interval=t.long_break_interval,
+            )
+
+    def _apply_theme(self, theme: str):
+        """应用浅色/深色主题"""
+        app = QApplication.instance()
+        if theme == "dark":
+            # 深色主题
+            palette = QPalette()
+            palette.setColor(QPalette.ColorRole.Window, QColor("#1E1E2E"))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor("#CDD6F4"))
+            palette.setColor(QPalette.ColorRole.Base, QColor("#181825"))
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#313244"))
+            palette.setColor(QPalette.ColorRole.Button, QColor("#313244"))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor("#CDD6F4"))
+            palette.setColor(QPalette.ColorRole.Text, QColor("#CDD6F4"))
+            palette.setColor(QPalette.ColorRole.BrightText, QColor("#F38BA8"))
+            palette.setColor(QPalette.ColorRole.Highlight, QColor("#89B4FA"))
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#1E1E2E"))
+            palette.setColor(QPalette.ColorRole.Link, QColor("#89B4FA"))
+            app.setPalette(palette)
+
+            self.setStyleSheet("""
+                QMainWindow { background: #1E1E2E; }
+                QLabel { color: #CDD6F4; }
+            """)
+        else:
+            # 浅色主题（默认）
+            palette = QPalette()
+            palette.setColor(QPalette.ColorRole.Window, QColor("#F5F6FA"))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor("#2C3E50"))
+            palette.setColor(QPalette.ColorRole.Base, QColor("#FFFFFF"))
+            palette.setColor(QPalette.ColorRole.Button, QColor("#ECF0F1"))
+            palette.setColor(QPalette.ColorRole.ButtonText, QColor("#2C3E50"))
+            palette.setColor(QPalette.ColorRole.Text, QColor("#2C3E50"))
+            palette.setColor(QPalette.ColorRole.Highlight, QColor("#3498DB"))
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
+            app.setPalette(palette)
+
+            self.setStyleSheet("""
+                QMainWindow { background: #F5F6FA; }
+            """)
+
+        # 更新窗口标题
+        lang = self._settings_manager.settings.language
+        t = STRINGS.get(lang, STRINGS["zh"])
+        self.setWindowTitle(t.get("window_title", "🍅 番茄钟"))
+
+    def _apply_language(self, lang: str):
+        """切换界面语言"""
+        t = STRINGS.get(lang, STRINGS["zh"])
+
+        # 侧边栏
+        self._sidebar_title.setText(t.get("app_name", "番茄钟"))
+        self._sidebar_version.setText(t.get("version", "v1.0.0"))
+        for i, key in enumerate(self._nav_keys):
+            label = {
+                "timer": t.get("nav_timer", "Timer"),
+                "stats": t.get("nav_stats", "Stats"),
+                "tasks": t.get("nav_tasks", "Tasks"),
+                "settings": t.get("nav_settings", "Settings"),
+            }[key]
+            self._nav_buttons[i].setText(f"{self._nav_icons[i]} {label}")
+        self._sidebar_footer.setText(f"🍅 {t.get('footer', 'Focus Every Moment')}")
+
+        # 窗口标题
+        self.setWindowTitle(t.get("window_title", "🍅 Tomato Clock"))
+
+        # 子组件语言切换
+        self._timer_widget.set_language(lang)
+        self._task_widget.set_language(lang)
+        # 统计看板通过重建刷新
 
     def _on_timer_completed(self, phase_name: str):
         if phase_name == "work":
