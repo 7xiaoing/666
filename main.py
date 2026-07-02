@@ -14,13 +14,36 @@
 
 import sys
 import os
+import traceback
 
 # 确保 src 在路径中
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QFont, QPalette, QColor
 from src.ui.main_window import MainWindow
+
+
+# ── 全局异常处理：防止 Qt 槽内异常导致应用静默崩溃 ──
+def excepthook(exc_type, exc_value, exc_tb):
+    """捕获未处理的异常并在消息框中显示"""
+    msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    print(msg, file=sys.stderr)
+    try:
+        app = QApplication.instance()
+        if app:
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("🍅 程序出错")
+            msg_box.setText("应用遇到了一个错误，请截图以下信息：")
+            msg_box.setDetailedText(msg)
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
+    except Exception:
+        pass  # 保底，不继续抛
+
+
+sys.excepthook = excepthook
 
 
 def main():

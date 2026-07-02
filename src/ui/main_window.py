@@ -61,6 +61,8 @@ class MainWindow(QMainWindow):
         self._timer = PomodoroTimer()
         self._apply_settings()
 
+        self._tray_icon = None  # 初始化，避免系统托盘不可用时崩溃
+
         self._setup_window()
         self._setup_ui()
         self._setup_tray()
@@ -253,6 +255,8 @@ class MainWindow(QMainWindow):
             self._tray_icon.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, 5000)
 
     def _update_tray_tooltip(self, remaining: int):
+        if self._tray_icon is None:
+            return
         if self._timer.state == TimerState.RUNNING:
             m = remaining // 60
             s = remaining % 60

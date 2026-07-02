@@ -90,26 +90,22 @@ class TimerWidget(QWidget):
         self._phase_label.setFont(font)
         self._phase_label.setStyleSheet("color: #7F8C8D;")
 
-        # ── 圆形进度 ──
+        # ── 圆形进度 + 时间显示 ──
         self._circular_progress = CircularProgressBar()
         container = QHBoxLayout()
         container.addStretch()
         container.addWidget(self._circular_progress)
         container.addStretch()
 
-        # ── 时间显示 ──
         self._time_label = QLabel("25:00")
         self._time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         font = QFont("Segoe UI", 56, QFont.Weight.Light)
         self._time_label.setFont(font)
         self._time_label.setStyleSheet("color: #2C3E50;")
-
-        # 叠加在圆形进度上
-        time_container = QWidget()
-        time_layout = QVBoxLayout(time_container)
-        time_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        time_layout.addWidget(self._time_label)
-        time_layout.setContentsMargins(0, 0, 0, 0)
+        # 将时间标签叠加在圆形进度条上
+        self._time_label.setParent(self._circular_progress)
+        self._time_label.setGeometry(0, 90, 280, 100)
+        self._time_label.raise_()
 
         # 进度条
         self._progress_bar = QProgressBar()
